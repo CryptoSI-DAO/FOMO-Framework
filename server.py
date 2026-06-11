@@ -8,10 +8,14 @@ import json
 import uuid
 import subprocess
 import threading
+import logging
 import requests
 from datetime import datetime, timezone
 from pathlib import Path
 from flask import Flask, request, jsonify
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("fomo-radio")
 
 app = Flask(__name__)
 
@@ -21,6 +25,8 @@ MEDIA_DIR = PROJECT_DIR / "media"
 DATA_JSON_PATH = Path("/workspace/app-archive-repo/data.json")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "fomo-radio-secret")
+ARWEAVE_WALLET_PATH = os.environ.get("ARWEAVE_WALLET_PATH", "/root/.arweave/wallet.json")
+ARWEAVE_GATEWAY = os.environ.get("ARWEAVE_GATEWAY", "https://arweave.net")
 
 # In-memory job store (use Redis in production)
 jobs = {}
@@ -58,6 +64,76 @@ def git_push_data_json():
     except subprocess.CalledProcessError as e:
         print(f"Git push failed: {e}")
         return False
+
+
+def upload_to_arweave(file_path: str):
+    """
+    Upload a file to Arweave.
+    Args:
+        file_path: Absolute path to the MP3/MP4 file
+    Returns:
+        43-char Arweave transaction ID, or None on failure
+    """
+    try:
+        if not ARWEAVE_WALLET_PATH or not Path(ARWEAVE_WALLET_PATH).exists():
+            logger.error("ARWEAVE_WALLET_PATH not set or file not found: %s", ARWEAVE_WALLET_PATH)
+            return None
+
+        try:
+            import ar
+        except ImportError:
+            logger.error("pyarweave not installed. Run: pip install pyarweave")
+            return None
+
+        file_path = Path(file_path)
+        if not file_path.exists():
+            logger.error("File not found for Arweave upload: %s", file_path)
+            return None
+
+        suffix = file_path.suffix.lower()
+        if suffix == ".mp3":
+            content_type = "audio/mpeg"
+        elif suffix == ".mp4":
+            content_type = "video/mp4"
+        else:
+            content_type = "application/octet-stream"
+
+        logger.info("Uploading %s to Arweave (%s)...", file_path.name, content_type)
+
+        with open(ARWEAVE_WALLET_PATH) as f:
+            jwk = json.load(f)
+
+        wallet = ar.Wallet.from_data(jwk)
+
+        with open(file_path, "rb") as f:
+            data = f.read()
+
+        txn = ar.Transaction(wallet=wallet, data=data)
+        txn.add_tag("Content-Type", content_type)
+        txn.add_tag("App-Name", "FOMO-Radio")
+        txn.add_tag("File-Name", file_path.name)
+        txn.sign()
+
+        # Post the transaction to Arweave via HTTP JSON
+        import requests as _requests
+        txn_dict = txn.to_dict()
+        _resp = _requests.post(
+            f"{ARWEAVE_GATEWAY}/tx",
+            json=txn_dict,
+            headers={"Content-Type": "application/json"},
+            timeout=60,
+        )
+        if _resp.status_code not in (200, 202):
+            logger.error("Arweave upload rejected: %s %s", _resp.status_code, _resp.text[:200])
+            return None
+
+        tx_id = txn.id
+        logger.info("Arweave upload successful: %s (size: %d bytes)", tx_id, len(data))
+        return tx_id
+
+    except Exception as e:
+        logger.error("Arweave upload failed: %s", e)
+        return None
 
 
 def run_pipeline(job_id: str, show_type: str, scope: str, slug: str, date: str):
@@ -101,9 +177,14 @@ def run_pipeline(job_id: str, show_type: str, scope: str, slug: str, date: str):
             jobs[job_id]["mp3_path"] = latest_mp3
             jobs[job_id]["stdout"] = result.stdout
 
-            # TODO: Upload to Arweave (by other dev)
-            # For now, store local path
-            arweave_tx = None  # Will be set by Arweave webhook
+            # Upload to Arweave
+            arweave_tx = None
+            if latest_mp3:
+                arweave_tx = upload_to_arweave(latest_mp3)
+                if arweave_tx:
+                    logger.info("Uploaded to Arweave: %s", arweave_tx)
+                else:
+                    logger.warning("Arweave upload failed or not configured, will rely on webhook")
 
             # Update data.json
             data = load_data_json()

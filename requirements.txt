@@ -105,6 +105,8 @@ pydantic-core==2.27.1
     #   pydantic
 pydub==0.25.1
     # via -r requirements.in
+pyarweave
+    # via -r requirements.in
 python-dateutil==2.9.0.post0
     # via
     #   dateutils
