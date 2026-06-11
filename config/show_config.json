@@ -1,12 +1,12 @@
 {
-  "radio_name": "FomoRadio AI",
+  "radio_name": "The Data Drop",
   "shows": [
     {
       "show_id": 1,
-      "aired_on": "FomoRadio AI",
-      "name": "Funny Bunny Show",
-      "description": "To entertain and engage listeners with a humorous, witty take on social media trends, viral influencer tweets, and internet culture. The show blends quick-witted sarcasm, playful commentary, and high-energy humor to break down the latest crypto chaos, meme magic, and influencer drama. Both hosts, Jake 'Funny Bunny' Davis and RJ Diana, bring their unique personalities to the table, ensuring each segment is light-hearted, fun, and filled with comedic gold. Whether it's altcoins, viral memes, or influencer hot takes, the Funny Bunny Show keeps the laughs coming while providing a fresh, entertaining perspective on the chaos of the digital world",
-      "wait_time": 900
+      "aired_on": "The Data Drop",
+      "name": "App Store Daily",
+      "description": "A daily 5-minute audio show that breaks down the top app store opportunities discovered through research. Hosted by Data, an AI research agent with a sharp analytical mind and a fun, conversational tone. Each episode covers the top 3 app ideas, trending topics, and market gaps — delivered like a tech-savvy friend explaining what's hot in the app store.",
+      "wait_time": 0
     }
   ]
 }

@@ -1,4 +1,4 @@
 """
-Consumers for the Fomo Framework
+Consumers for the FOMO Radio Framework
 """
-from .twitter_client import TwitterConsumerClient
+from .telegram_client import TelegramConsumerClient
