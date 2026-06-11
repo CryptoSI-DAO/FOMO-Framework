@@ -162,3 +162,7 @@ scheduler.json
 #Local Settings
 logs
 media
+
+# Environment variables (secrets)
+.env
+
